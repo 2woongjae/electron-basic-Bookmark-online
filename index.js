@@ -23,21 +23,19 @@ const template = [
             {
                 label: 'Home',
                 click: () => {
-                    const item = {
+                    save({
                         type: 'home',
                         url: clipboard.readText()
-                    };
-                    save(item);
+                    });
                 }
             },
             {
                 label: 'Github',
                 click: () => {
-                    const item = {
+                    save({
                         type: 'github',
                         url: clipboard.readText()
-                    };
-                    save(item);
+                    });
                 }
             }
         ]
@@ -70,33 +68,49 @@ const context = [
 ];
 
 app.on('ready', () => {
+    if (process.platform === 'darwin') {
+        tray = new Tray(path.join(__dirname, './icon.png'));
+    } else {
+        tray = new Tray(path.join(__dirname, './icon_white.png'));    
+    }
+    tray.setContextMenu(Menu.buildFromTemplate(template));
     Menu.setApplicationMenu(Menu.buildFromTemplate(context));
-    const menu = Menu.buildFromTemplate(template);
-    tray = new Tray(path.join(__dirname, './icon.png'));
-    tray.setContextMenu(menu);
-    tray.on('right-click', () => {
-        toggle();
-    });
+
+    if (process.platform === 'darwin') {
+        tray.on('right-click', () => {
+            toggle();
+        });
+    } else {
+        tray.on('click', () => {
+            toggle();
+        });
+    }
+
     const bounds = tray.getBounds();
+    
     win = new BrowserWindow({
         width: 400,
         height: 400,
-        x: bounds.x + (bounds.width / 2) - 200,
-        y: bounds.y + bounds.height + 10,
+        x: Math.round(bounds.x + (bounds.width / 2) - 200),
+        y: (process.platform === 'darwin') ? bounds.y + bounds.height + 10 : bounds.y - 400 - 10,
         acceptFirstMouse: true,
         show: false,
         resizable: false,
         movable: false,
         frame: false
     });
+    
     win.loadURL(`file://${__dirname}/index.html`);
+    
     win.once('ready-to-show', () => {
         win.webContents.send('update', data);
     });
 
-    win.on('blur', () => {
-        win.hide();
-    });
+    if (process.platform === 'darwin') {
+        win.on('blur', () => {
+            win.hide();
+        });
+    }
 
     ipcMain.on('paste', (event, item) => {
         save(item);
@@ -123,8 +137,7 @@ function save(item) {
         const url = item.url;
         request.get(url)
             .end((err, response) => {
-                const contents = response.res.text;
-                getTitle(contents).then(title => {
+                getTitle(response.res.text).then(title => {
                     data.push({type, url, title});
                     fs.writeFileSync(DATA_PATH, JSON.stringify(data));
                     win.webContents.send('update', data);
