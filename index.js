@@ -101,6 +101,7 @@ app.on('ready', () => {
     });
     
     win.loadURL(`file://${__dirname}/index.html`);
+    // win.webContents.openDevTools();
     
     win.once('ready-to-show', () => {
         win.webContents.send('update', data);
